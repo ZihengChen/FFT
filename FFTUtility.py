@@ -159,12 +159,13 @@ def Signal_RecoPhase(p,time,ir_para):
     return (0.5*p**2 +ip)*time - IR_RecoPHI(p,time,ir_para)
 
 
-def Signal_Reco(prange,delayrange,time,ir_para,uv_para,threading=0):
-    start = timer()
-    dt         = time[1]-time[0]
-    maxdelay   = np.max(np.abs(delayrange))
+def Signal_Reco(prange,delayrange,time,ir_para,uv_para,threading=1):
     
-    if threading>0 :
+    dt         = time[1]-time[0]
+    maxdelay   = -delayrange[0]
+    delayrange = np.arange(-maxdelay,maxdelay,dt)
+    
+    if threading>1 :
         signal_phase= Parallel(n_jobs=threading)(delayed(Signal_RecoPhase)(p,time,ir_para) for p in prange)
     else:
         signal_phase= np.array([Signal_RecoPhase(p,time,ir_para) for p in prange])
@@ -175,7 +176,7 @@ def Signal_Reco(prange,delayrange,time,ir_para,uv_para,threading=0):
     realpart        = np.dot(np.cos(signal_phase),signal_ampshift.T) * dt
     imagpart        = np.dot(np.sin(signal_phase),signal_ampshift.T) * dt
     
-    print(timer() - start) 
+    
     return realpart**2 + imagpart**2
 
 
