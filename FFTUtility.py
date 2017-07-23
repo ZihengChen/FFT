@@ -4,6 +4,9 @@ import scipy as sp
 import matplotlib.pyplot as plt
 from scipy.fftpack import ifft,fft,fftfreq,fftshift
 from scipy.interpolate import interp1d
+from timeit import default_timer as timer
+from joblib import Parallel, delayed
+
 
 FREQUENCESTEP = 0.01    # smaller, wider time range
 FREQUENCEMAX = 50        # Larger, better time resolution
@@ -151,20 +154,30 @@ def UV_RecoE (time,uv_para):
     temp     = uv_amp * temp
     return temp
 
+def Signal_RecoPhase(p,time,ir_para):
+    ip = 0
+    return (0.5*p**2 +ip)*time - IR_RecoPHI(p,time,ir_para)
 
-def Signal_Reco(prange,maxdelay,ip,time,ir_para,uv_para):
-    dt       = time[1]-time[0]
-    delayrange = np.arange(-maxdelay,maxdelay,dt)
-    momentum = prange
+
+def Signal_Reco(prange,delayrange,time,ir_para,uv_para,threading=0):
+    start = timer()
+    dt         = time[1]-time[0]
+    maxdelay   = np.max(np.abs(delayrange))
     
-    signal_phase    = np.array([(0.5*p**2 +ip)*time - IR_RecoPHI(p,time,ir_para) for p in momentum])
+    if threading>0 :
+        signal_phase= Parallel(n_jobs=threading)(delayed(Signal_RecoPhase)(p,time,ir_para) for p in prange)
+    else:
+        signal_phase= np.array([Signal_RecoPhase(p,time,ir_para) for p in prange])
     signal_amp      = UV_RecoE(time,uv_para)
     signal_amp      = np.pad(signal_amp,(int(maxdelay/dt),int(maxdelay/dt)+1),'constant', constant_values=(0, 0))
     signal_ampshift = np.array([signal_amp[  int((maxdelay-tau)/dt) : int((maxdelay+100-tau)/dt)+1] for tau in delayrange])
     
     realpart        = np.dot(np.cos(signal_phase),signal_ampshift.T) * dt
     imagpart        = np.dot(np.sin(signal_phase),signal_ampshift.T) * dt
+    
+    print(timer() - start) 
     return realpart**2 + imagpart**2
+
 
 
 # This function is too slow, not being used.
